@@ -6,6 +6,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"os"
+	"path"
 )
 
 type JSON_ls_data struct {
@@ -42,21 +43,25 @@ func main() {
 		fmt.Println(data.Request)
 
 		if data.Request == "cd" {
-			curr_path += data.Path + "/"
+			//curr_path += data.Path + "/"
+			curr_path = path.Join(curr_path, data.Path)
 			files_data, err = ls(curr_path)
 			if err != nil {
-				fmt.Println(err)
+				ctx.JSON(400, gin.H{"error": err})
 				return
 			}
-		} else if data.Request == "open" {
-			//file_path := curr_path + data.Path
-			fmt.Println("Yay")
-			ctx.Header("Content-Disposition", "attachment; filename=lol.mp4")
-			ctx.Header("Content-Type", "video/mp4")
-			fmt.Println("done")
 		}
+	})
 
-		fmt.Println(curr_path)
+	r.GET("/download", func(ctx *gin.Context) {
+		file_name := ctx.DefaultQuery("name", "")
+		file_path := path.Join(curr_path, file_name)
+		fmt.Println("requested file:", file_path)
+		if _, err := os.Stat(file_path); os.IsNotExist(err) {
+			ctx.JSON(404, gin.H{"error": "File not found"})
+			return
+		}
+		ctx.FileAttachment(file_path, file_name)
 	})
 
 	r.PUT("/", func(ctx *gin.Context) {
