@@ -3,10 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 	"os"
-	"path"
 )
 
 type JSON_ls_data struct {
@@ -14,64 +11,30 @@ type JSON_ls_data struct {
 	Title string `json:"title"`
 }
 
-type JSON_cd_req struct {
+type JSON_ls_res struct {
+	Files     []JSON_ls_data `json:"files"`
+	Curr_path string         `json:"curr_path"`
+}
+
+type JSON_req struct {
 	Request string `json:"request"`
 	Path    string `json:"path"`
 }
 
 func main() {
-	r := gin.Default()
-	r.Use(cors.Default())
-	curr_path := "/home/ahmed/"
-	files_data, err := ls(curr_path)
-	if err != nil {
-		fmt.Println(err)
+	r, err := server()
+	if err != nil || r == nil {
+		fmt.Println("Error :", err)
+		fmt.Printf("Server could not be setup, try again")
 		return
 	}
-	r.GET("/", func(ctx *gin.Context) {
-		ctx.String(200, string(files_data))
-	})
 
-	r.POST("/req", func(ctx *gin.Context) {
-		var data JSON_cd_req
-
-		if err := ctx.ShouldBindJSON(&data); err != nil {
-			ctx.JSON(400, gin.H{"error": err})
-			return
-		}
-
-		fmt.Println(data.Request)
-
-		if data.Request == "cd" {
-			//curr_path += data.Path + "/"
-			curr_path = path.Join(curr_path, data.Path)
-			files_data, err = ls(curr_path)
-			if err != nil {
-				ctx.JSON(400, gin.H{"error": err})
-				return
-			}
-		}
-	})
-
-	r.GET("/download", func(ctx *gin.Context) {
-		file_name := ctx.DefaultQuery("name", "")
-		file_path := path.Join(curr_path, file_name)
-		fmt.Println("requested file:", file_path)
-		if _, err := os.Stat(file_path); os.IsNotExist(err) {
-			ctx.JSON(404, gin.H{"error": "File not found"})
-			return
-		}
-		ctx.FileAttachment(file_path, file_name)
-	})
-
-	r.PUT("/", func(ctx *gin.Context) {
-		ctx.String(200, string(files_data))
-	})
-
-	r.Run(":8000")
+	if err := r.Run(":8000"); err != nil {
+		fmt.Println("Failed to start server:", err)
+	}
 }
 
-func ls(path string) ([]byte, error) {
+func ls(path string) ([]byte, error) { // ls fetches files
 	dir, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
@@ -95,6 +58,10 @@ func ls(path string) ([]byte, error) {
 		})
 	}
 
-	json_data, _ := json.Marshal(j)
+	var res_data JSON_ls_res
+	res_data.Files = j
+	res_data.Curr_path = path
+
+	json_data, _ := json.Marshal(res_data)
 	return json_data, nil
 }
